@@ -8,9 +8,14 @@
 
 #include <Arduino.h>
 #include <Wire.h>
+
+#if !defined(I2C_BUFFER_LENGTH)
+#define I2C_BUFFER_LENGTH BUFFER_LENGTH // hack for Teensyduino
+#endif // !defined(I2C_BUFFER_LENGTH)
+
 #include "initGT911_Structs.h"
 
-// #define GT911_Debug_Serial
+#define GT911_Debug_Serial
 
 #ifdef GT911_Debug_Serial
 #define GT911_Log(a) Serial.println("[GT911] " + String(a))

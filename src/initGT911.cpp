@@ -186,6 +186,7 @@ int8_t initGT911::readTouches()
   do
   {
     uint8_t flag = read(GT911_REG_COORD_ADDR);
+    GT911_Logf("GT911_REG_COORD_ADDR: %02X", flag);
     if ((flag & 0x80) && ((flag & 0x0F) < GT911_MAX_CONTACTS))
     {
       write(GT911_REG_COORD_ADDR, 0);

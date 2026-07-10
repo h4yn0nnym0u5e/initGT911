@@ -7,19 +7,24 @@
 #define INIT_GT911_H
 
 #include <Arduino.h>
-#include <Wire.h>
+#include <i2c_driver_wire.h>
+#include <imx_rt1060/imx_rt1060_i2c_driver.h>
 
 #if !defined(I2C_BUFFER_LENGTH)
+#if defined(I2C_DRIVER_WIRE_H)
+#define I2C_BUFFER_LENGTH I2CDriverWire::rx_buffer_length // async I2C library definition
+#else
 #define I2C_BUFFER_LENGTH BUFFER_LENGTH // hack for Teensyduino
+#endif // defined(I2C_DRIVER_WIRE_H)
 #endif // !defined(I2C_BUFFER_LENGTH)
 
 #include "initGT911_Structs.h"
 
-//#define GT911_Debug_Serial
+#define GT911_Debug_Serial
 
 #ifdef GT911_Debug_Serial
-#define GT911_Log(a) Serial.println("[GT911] " + String(a))
-#define GT911_Logf(a, ...) Serial.printf(String("[GT911] " + String(a) + "\n").c_str(), ##__VA_ARGS__)
+#define GT911_Log(a) Serial.printf(String("[GT911] @ %d: " + String(a) + "\n").c_str(), millis())
+#define GT911_Logf(a, ...) Serial.printf(String("[GT911] @ %d: " + String(a) + "\n").c_str(), millis(), ##__VA_ARGS__)
 #else
 #define GT911_Log(a)
 #define GT911_Logf(a, ...)
@@ -54,9 +59,10 @@ typedef enum : uint8_t
 
 class initGT911
 {
-public:
+
 private:
-  TwoWire *_wire;
+  //TwoWire *_wire;
+  I2CMaster* _wire;
   int8_t _intPin;
   int8_t _rstPin;
   uint8_t _addr;
@@ -68,6 +74,11 @@ private:
 
   void reset();
   void i2cStart(uint16_t reg);
+  bool finish(uint32_t timeout_millis = 50);
+  bool endTransmission(size_t expected)
+  {
+    return finish() && expected == _wire->get_bytes_transferred();  
+  }
   bool write(uint16_t reg, uint8_t data);
   uint8_t read(uint16_t reg);
   bool writeBytes(uint16_t reg, uint8_t *data, uint16_t size);
@@ -78,7 +89,7 @@ private:
   bool readTouchPoints();
 
 public:
-  initGT911(TwoWire *twi = &Wire, uint8_t addr = GT911_I2C_ADDR_BA);
+  initGT911(I2CMaster *twi = &Master, uint8_t addr = GT911_I2C_ADDR_BA);
   bool begin(int8_t intPin = -1, int8_t rstPin = -1, uint32_t clk = 400000);
   bool productID(uint8_t *buf, uint8_t len);
   GTConfig *readConfig();

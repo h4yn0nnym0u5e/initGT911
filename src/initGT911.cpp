@@ -1,5 +1,5 @@
 #include "initGT911.h"
-#include <Wire.h>
+//#include <Wire.h>
 
 #ifndef ICACHE_RAM_ATTR
 #define ICACHE_RAM_ATTR
@@ -29,7 +29,7 @@ void _gt911_irq_handler()
 }
 #endif
 
-initGT911::initGT911(TwoWire *twi, uint8_t addr) : _wire(twi ? twi : &Wire)
+initGT911::initGT911(I2CMaster *twi, uint8_t addr) : _wire(twi ? twi : &Master)
 {
   _addr = addr;
 }
@@ -57,23 +57,45 @@ void initGT911::reset()
   delay(51);
 }
 
+bool initGT911::finish(uint32_t timeout_millis)
+{
+  elapsedMillis timeout;
+  while (timeout < timeout_millis) {
+      yield(); // TODO: fix this!
+      if (_wire->finished()) {
+          return false;
+      }
+  }
+  return true;
+}
+
 void initGT911::i2cStart(uint16_t reg)
 {
+  /*
   _wire->beginTransmission(_addr);
   _wire->write(reg >> 8);
   _wire->write(reg & 0xFF);
+  */
+ uint8_t buf[2]{(uint8_t)(reg>>8),(uint8_t)(reg&0xFF)};
+ _wire->write_async(_addr,buf,2,false);
+ finish();
 }
 
 bool initGT911::write(uint16_t reg, uint8_t data)
 {
   i2cStart(reg);
+  /*
   _wire->write(data);
   return _wire->endTransmission() == 0;
+  */
+  _wire->write_async(_addr,&data,1,true);
+  return endTransmission(1);
 }
 
 uint8_t initGT911::read(uint16_t reg)
 {
   i2cStart(reg);
+  /*
   if (_wire->endTransmission() != 0)
   {
     GT911_Log("I2C read single byte: endTransmission error");
@@ -87,16 +109,25 @@ uint8_t initGT911::read(uint16_t reg)
     return 0;
   }
   return _wire->read();
+  */
+  uint8_t result;
+  _wire->read_async(_addr,&result,1,true);
+  finish();
+  return result;
 }
 
 bool initGT911::writeBytes(uint16_t reg, uint8_t *data, uint16_t size)
 {
   i2cStart(reg);
+  /*
   for (uint16_t i = 0; i < size; i++)
   {
     _wire->write(data[i]);
   }
   return _wire->endTransmission() == 0;
+  */
+  _wire->write_async(_addr,data,size,true);
+  return endTransmission(size);
 }
 
 bool initGT911::readBytes(uint16_t reg, uint8_t *data, uint16_t size)
@@ -106,12 +137,13 @@ bool initGT911::readBytes(uint16_t reg, uint8_t *data, uint16_t size)
 
   // Start write of register pointer
   i2cStart(reg);
+  /*
   if (_wire->endTransmission() != 0)
   {
     GT911_Log("readBytes I2C error: endTransmission");
     return false; // I2C error
   }
-
+  */
   uint16_t index = 0;
   const unsigned long overallTimeout = 2000; // ms
   unsigned long startTime = millis();
@@ -125,8 +157,13 @@ bool initGT911::readBytes(uint16_t reg, uint8_t *data, uint16_t size)
     }
 
     uint8_t req = (uint8_t)min<uint16_t>(size - index, I2C_BUFFER_LENGTH);
-    uint8_t got = _wire->requestFrom((int)_addr, (int)req);
+    //uint8_t got = _wire->requestFrom((int)_addr, (int)req);
+    _wire->read_async(_addr,data+index,req,req == size - index); // send stop on last request
+    uint8_t got = _wire->get_bytes_transferred();
 
+    if (got != 0)
+      index += got;
+    /*
     if (got == 0)
     {
       // small backoff and retry once
@@ -154,13 +191,13 @@ bool initGT911::readBytes(uint16_t reg, uint8_t *data, uint16_t size)
         break;
       }
     }
-
+    */
     // small yield to avoid WDT and give bus time
     delayMicroseconds(50);
-    yield();
+    yield(); // TODO: fix this!
   }
 
-  GT911_Logf("readBytes: read %d bytes\n", index);
+  GT911_Logf("readBytes: read %d bytes", index);
   return index == size;
 }
 
@@ -183,6 +220,7 @@ uint8_t initGT911::readChecksum()
 int8_t initGT911::readTouches()
 {
   uint32_t timeout = millis() + 20;
+  GT911_Logf("Reading touches:");
   do
   {
     uint8_t flag = read(GT911_REG_COORD_ADDR);
@@ -228,13 +266,16 @@ bool initGT911::begin(int8_t intPin, int8_t rstPin, uint32_t clk)
     reset();
     delay(200);
   }
-  _wire->begin();
+  _wire->begin(clk);
+  /*
   _wire->setClock(clk);
   _wire->beginTransmission(_addr);
   if (_wire->endTransmission() == 0)
   {
     readInfo(); // Need to get resolution to use rotation
-
+*/
+  if (nullptr != readInfo())
+  {
     if (intPin > 0)
     {
       pinMode(_intPin, INPUT);
@@ -286,8 +327,11 @@ bool initGT911::updateConfig()
 
 GTInfo *initGT911::readInfo()
 {
-  readBytes(GT911_REG_DATA, (uint8_t *)&_info, sizeof(_info));
-  return &_info;
+  GTInfo* result = nullptr;
+  if (readBytes(GT911_REG_DATA, (uint8_t *)&_info, sizeof(_info)))
+    result = &_info;
+Serial.printf("Info at %08X\n", (uint32_t) result);    
+  return result;
 }
 
 uint8_t initGT911::touched(uint8_t mode)

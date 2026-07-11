@@ -12,7 +12,7 @@
 
 #if !defined(I2C_BUFFER_LENGTH)
 #if defined(I2C_DRIVER_WIRE_H)
-#define I2C_BUFFER_LENGTH I2CDriverWire::rx_buffer_length // async I2C library definition
+#define I2C_BUFFER_LENGTH 256 // MAX_MASTER_READ_LENGTH // async I2C library definition
 #else
 #define I2C_BUFFER_LENGTH BUFFER_LENGTH // hack for Teensyduino
 #endif // defined(I2C_DRIVER_WIRE_H)
@@ -67,6 +67,7 @@ private:
   int8_t _rstPin;
   uint8_t _addr;
 
+  static volatile bool gt911IRQ;
   bool _configLoaded = false;
   GTConfig _config;
   GTInfo _info;
@@ -87,6 +88,9 @@ private:
   uint8_t readChecksum();
   int8_t readTouches();
   bool readTouchPoints();
+  void* context{nullptr};
+  void (*async_wait)(void* context){nullptr};
+  static void _gt911_irq_handler(void);
 
 public:
   initGT911(I2CMaster *twi = &Master, uint8_t addr = GT911_I2C_ADDR_BA);
@@ -95,12 +99,24 @@ public:
   GTConfig *readConfig();
   bool updateConfig();
   GTInfo *readInfo();
+  I2CMaster& getWire(void) { return *_wire; }
 
   uint8_t touched(uint8_t mode = GT911_MODE_INTERRUPT);
   GTPoint getPoint(uint8_t num);
   GTPoint *getPoints();
 
   void setupDisplay(uint16_t xRes, uint16_t yRes, rotation_t rotation);
+
+  // Allow user code to override the default ISR, e.g. 
+  // if an RTOS task is blocked waiting for it
+  void setInterruptHandler(void (*_isr)(void) = _gt911_irq_handler); 
+  void setIRQflag(bool b) { gt911IRQ = b; }
+
+  // Normal "wait" just calls yield() repeatedly, but the 
+  // user can override this to block an RTOS task (allowing others
+  // to run) until the transaction completes
+  void setAsyncWait(void (*fn)(void*)) { async_wait = fn; }
+  void setContext(void* ctxt) { context = ctxt; }
 };
 
 #endif // INIT_GT911_H

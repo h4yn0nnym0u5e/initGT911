@@ -5,8 +5,9 @@
 #define ICACHE_RAM_ATTR
 #endif
 
+
 // Interrupt handling
-volatile bool gt911IRQ = false;
+volatile bool initGT911::gt911IRQ = false;
 
 #if defined(ESP8266)
 void ICACHE_RAM_ATTR _gt911_irq_handler()
@@ -21,13 +22,21 @@ void IRAM_ATTR _gt911_irq_handler()
   gt911IRQ = true;
 }
 #else
-void _gt911_irq_handler()
+void initGT911::_gt911_irq_handler()
 {
   noInterrupts();
   gt911IRQ = true;
   interrupts();
 }
 #endif
+
+void initGT911::setInterruptHandler(void (*_isr)(void)) 
+{
+  if (nullptr == _isr)
+    detachInterrupt(_intPin);
+  else       
+    attachInterrupt(_intPin, _isr, FALLING);
+}
 
 initGT911::initGT911(I2CMaster *twi, uint8_t addr) : _wire(twi ? twi : &Master)
 {
@@ -61,7 +70,10 @@ bool initGT911::finish(uint32_t timeout_millis)
 {
   elapsedMillis timeout;
   while (timeout < timeout_millis) {
-      yield(); // TODO: fix this!
+      if (nullptr != async_wait)
+        async_wait(context);
+      else        
+        yield();
       if (_wire->finished()) {
           return false;
       }
@@ -88,7 +100,7 @@ bool initGT911::write(uint16_t reg, uint8_t data)
   _wire->write(data);
   return _wire->endTransmission() == 0;
   */
-  _wire->write_async(_addr,&data,1,true);
+  _wire->write_async(_wire->NO_RESTART,&data,1,true);
   return endTransmission(1);
 }
 
@@ -126,7 +138,7 @@ bool initGT911::writeBytes(uint16_t reg, uint8_t *data, uint16_t size)
   }
   return _wire->endTransmission() == 0;
   */
-  _wire->write_async(_addr,data,size,true);
+  _wire->write_async(_wire->NO_RESTART,data,size,true);
   return endTransmission(size);
 }
 
@@ -145,8 +157,9 @@ bool initGT911::readBytes(uint16_t reg, uint8_t *data, uint16_t size)
   }
   */
   uint16_t index = 0;
-  const unsigned long overallTimeout = 2000; // ms
+  const unsigned long overallTimeout = 20;//00; // ms
   unsigned long startTime = millis();
+  int addr = _addr; // first read needs re-start
 
   while (index < size)
   {
@@ -157,10 +170,13 @@ bool initGT911::readBytes(uint16_t reg, uint8_t *data, uint16_t size)
     }
 
     uint8_t req = (uint8_t)min<uint16_t>(size - index, I2C_BUFFER_LENGTH);
+    bool do_stop = req == (size - index);
     //uint8_t got = _wire->requestFrom((int)_addr, (int)req);
-    _wire->read_async(_addr,data+index,req,req == size - index); // send stop on last request
+    _wire->read_async(addr,data+index,req,do_stop); // send stop on last request
+    addr = _wire->NO_RESTART;
+    finish();
     uint8_t got = _wire->get_bytes_transferred();
-
+    GT911_Logf("req %d, got %d bytes; %sstop requested", req, got, do_stop?"":"no ");
     if (got != 0)
       index += got;
     /*
@@ -224,9 +240,9 @@ int8_t initGT911::readTouches()
   do
   {
     uint8_t flag = read(GT911_REG_COORD_ADDR);
-    GT911_Logf("GT911_REG_COORD_ADDR: %02X", flag);
     if ((flag & 0x80) && ((flag & 0x0F) < GT911_MAX_CONTACTS))
     {
+      GT911_Logf("GT911_REG_COORD_ADDR: %02X", flag);
       write(GT911_REG_COORD_ADDR, 0);
       return flag & 0x0F;
     }
@@ -279,7 +295,7 @@ bool initGT911::begin(int8_t intPin, int8_t rstPin, uint32_t clk)
     if (intPin > 0)
     {
       pinMode(_intPin, INPUT);
-      attachInterrupt(_intPin, _gt911_irq_handler, FALLING);
+      setInterruptHandler(); // set to default
     }
     return true;
   }

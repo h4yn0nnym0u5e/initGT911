@@ -20,14 +20,14 @@
 
 #include "initGT911_Structs.h"
 
-#define GT911_Debug_Serial
+//#define GT911_Debug_Serial
 
 #ifdef GT911_Debug_Serial
 #define GT911_Log(a) Serial.printf(String("[GT911] @ %d: " + String(a) + "\n").c_str(), millis())
 #define GT911_Logf(a, ...) Serial.printf(String("[GT911] @ %d: " + String(a) + "\n").c_str(), millis(), ##__VA_ARGS__)
 #else
-#define GT911_Log(a)
-#define GT911_Logf(a, ...)
+#define GT911_Log(...)
+#define GT911_Logf(...)
 #endif // GT911_Debug_Serial
 
 // 0x28/0x29 (0x14 7bit)

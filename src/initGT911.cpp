@@ -5,10 +5,22 @@
 #define ICACHE_RAM_ATTR
 #endif
 
-
+//    d8b          888                                              888    
+//    Y8P          888                                              888    
+//                 888                                              888    
+//    888 88888b.  888888 .d88b.  888d888 888d888 888  888 88888b.  888888 
+//    888 888 "88b 888   d8P  Y8b 888P"   888P"   888  888 888 "88b 888    
+//    888 888  888 888   88888888 888     888     888  888 888  888 888    
+//    888 888  888 Y88b. Y8b.     888     888     Y88b 888 888 d88P Y88b.  
+//    888 888  888  "Y888 "Y8888  888     888      "Y88888 88888P"   "Y888 
+//                                                         888             
+//                                                         888             
+//                                                         888             
+//                                                                         
 // Interrupt handling
 volatile bool initGT911::gt911IRQ = false;
 
+// default IRQ handlers
 #if defined(ESP8266)
 void ICACHE_RAM_ATTR _gt911_irq_handler()
 {
@@ -30,6 +42,7 @@ void initGT911::_gt911_irq_handler()
 }
 #endif
 
+
 void initGT911::setInterruptHandler(void (*_isr)(void)) 
 {
   if (nullptr == _isr)
@@ -38,16 +51,27 @@ void initGT911::setInterruptHandler(void (*_isr)(void))
     attachInterrupt(_intPin, _isr, FALLING);
 }
 
+
 // default delay
 void initGT911::_gt911_delay(uint32_t ms)
 {
   delay(ms);
 }
 
+//    d8b          d8b 888    
+//    Y8P          Y8P 888    
+//                     888    
+//    888 88888b.  888 888888 
+//    888 888 "88b 888 888    
+//    888 888  888 888 888    
+//    888 888  888 888 Y88b.  
+//    888 888  888 888  "Y888 
+// 
 initGT911::initGT911(I2CMaster *twi, uint8_t addr) : _wire(twi ? twi : &Master)
 {
   _addr = addr;
 }
+
 
 void initGT911::reset()
 {
@@ -72,6 +96,17 @@ void initGT911::reset()
   delay(51);
 }
 
+//    888                                                                                 
+//    888                                                                                 
+//    888                                                                                 
+//    88888b.  888  888 .d8888b        8888b.   .d8888b .d8888b .d88b.  .d8888b  .d8888b  
+//    888 "88b 888  888 88K               "88b d88P"   d88P"   d8P  Y8b 88K      88K      
+//    888  888 888  888 "Y8888b.      .d888888 888     888     88888888 "Y8888b. "Y8888b. 
+//    888 d88P Y88b 888      X88      888  888 Y88b.   Y88b.   Y8b.          X88      X88 
+//    88888P"   "Y88888  88888P'      "Y888888  "Y8888P "Y8888P "Y8888   88888P'  88888P' 
+//
+// wait until I²C transaction completes or times out
+// use setAsynWait() to change behaviour, e.g. use with RTOS
 bool initGT911::finish(uint32_t timeout_millis)
 {
   elapsedMillis timeout;
@@ -87,25 +122,19 @@ bool initGT911::finish(uint32_t timeout_millis)
   return true;
 }
 
+
+// send Start condition and register address
 void initGT911::i2cStart(uint16_t reg)
 {
-  /*
-  _wire->beginTransmission(_addr);
-  _wire->write(reg >> 8);
-  _wire->write(reg & 0xFF);
-  */
  uint8_t buf[2]{(uint8_t)(reg>>8),(uint8_t)(reg&0xFF)};
  _wire->write_async(_addr,buf,2,false);
  finish();
 }
 
+
 bool initGT911::write(uint16_t reg, uint8_t data)
 {
   i2cStart(reg);
-  /*
-  _wire->write(data);
-  return _wire->endTransmission() == 0;
-  */
   _wire->write_async(_wire->NO_RESTART,&data,1,true);
   return endTransmission(1);
 }
@@ -167,6 +196,8 @@ bool initGT911::readBytes(uint16_t reg, uint8_t *data, uint16_t size)
   unsigned long startTime = millis();
   int addr = _addr; // first read needs re-start
 
+  // TODO: fix this - multiple reads of I2C_BUFFER_LENGTH to
+  // get a large amount of data aren't working
   while (index < size)
   {
     if ((millis() - startTime) > overallTimeout)
@@ -185,35 +216,7 @@ bool initGT911::readBytes(uint16_t reg, uint8_t *data, uint16_t size)
     GT911_Logf("req %d, got %d bytes; %sstop requested", req, got, do_stop?"":"no ");
     if (got != 0)
       index += got;
-    /*
-    if (got == 0)
-    {
-      // small backoff and retry once
-      delay(5);
-      yield();
-      got = _wire->requestFrom((int)_addr, (int)req);
-      if (got == 0)
-      {
-        GT911_Log("I2C read error: no data available after retry");
-        return false;
-      }
-    }
 
-    uint8_t readCount = 0;
-    while (readCount < got && index < size)
-    {
-      if (_wire->available())
-      {
-        data[index++] = _wire->read();
-        readCount++;
-      }
-      else
-      {
-        // unexpected early end; break to outer loop to retry remaining
-        break;
-      }
-    }
-    */
     // small yield to avoid WDT and give bus time
     delayMicroseconds(50);
     yield(); // TODO: fix this!
@@ -223,6 +226,15 @@ bool initGT911::readBytes(uint16_t reg, uint8_t *data, uint16_t size)
   return index == size;
 }
 
+//     .d8888b. 88888888888 .d8888b.   d888    d888   
+//    d88P  Y88b    888    d88P  Y88b d8888   d8888   
+//    888    888    888    888    888   888     888   
+//    888           888    Y88b. d888   888     888   
+//    888  88888    888     "Y888P888   888     888   
+//    888    888    888           888   888     888   
+//    Y88b  d88P    888    Y88b  d88P   888     888   
+//     "Y8888P88    888     "Y8888P"  8888888 8888888 
+//
 uint8_t initGT911::calcChecksum(uint8_t *buf, uint8_t len)
 {
   uint8_t ccsum = 0;
@@ -262,6 +274,7 @@ bool initGT911::readTouchPoints()
 {
   bool result = readBytes(GT911_REG_COORD_ADDR + 1, (uint8_t *)_points, sizeof(GTPoint) * GT911_MAX_CONTACTS);
   /*
+    // TODO: rotation is broken, so commented out for now
     if (result)
     {
       for (uint8_t i = 0; i < GT911_MAX_CONTACTS; i++)
@@ -277,6 +290,14 @@ bool initGT911::readTouchPoints()
   return result;
 }
 
+
+//                                       
+//    888  888 .d8888b   .d88b.  888d888 
+//    888  888 88K      d8P  Y8b 888P"   
+//    888  888 "Y8888b. 88888888 888     
+//    Y88b 888      X88 Y8b.     888     
+//     "Y88888  88888P'  "Y8888  888     
+//
 bool initGT911::begin(int8_t intPin, int8_t rstPin, uint32_t clk)
 {
   _intPin = intPin;
@@ -288,14 +309,8 @@ bool initGT911::begin(int8_t intPin, int8_t rstPin, uint32_t clk)
     reset();
     delay(200);
   }
-  _wire->begin(clk);
-  /*
-  _wire->setClock(clk);
-  _wire->beginTransmission(_addr);
-  if (_wire->endTransmission() == 0)
-  {
-    readInfo(); // Need to get resolution to use rotation
-*/
+  _wire->begin(clk); // specific to async library
+
   if (nullptr != readInfo())
   {
     if (intPin > 0)
@@ -308,6 +323,7 @@ bool initGT911::begin(int8_t intPin, int8_t rstPin, uint32_t clk)
   return false;
 }
 
+
 bool initGT911::productID(uint8_t *buf, uint8_t len)
 {
   if (len < 4)
@@ -318,6 +334,7 @@ bool initGT911::productID(uint8_t *buf, uint8_t len)
   memset(buf, 0, 4);
   return readBytes(GT911_REG_ID, buf, 4);
 }
+
 
 GTConfig *initGT911::readConfig()
 {
@@ -330,6 +347,7 @@ GTConfig *initGT911::readConfig()
   }
   return nullptr;
 }
+
 
 bool initGT911::updateConfig()
 {
@@ -347,6 +365,7 @@ bool initGT911::updateConfig()
   return false;
 }
 
+
 GTInfo *initGT911::readInfo()
 {
   GTInfo* result = nullptr;
@@ -355,6 +374,7 @@ GTInfo *initGT911::readInfo()
 Serial.printf("Info at %08X\n", (uint32_t) result);    
   return result;
 }
+
 
 uint8_t initGT911::touched(uint8_t mode)
 {
@@ -383,15 +403,18 @@ uint8_t initGT911::touched(uint8_t mode)
   return contacts;
 }
 
+
 GTPoint initGT911::getPoint(uint8_t num)
 {
   return _points[num];
 }
 
+
 GTPoint *initGT911::getPoints()
 {
   return _points;
 }
+
 
 void initGT911::setupDisplay(uint16_t xRes, uint16_t yRes, rotation_t rotation)
 {

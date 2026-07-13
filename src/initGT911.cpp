@@ -38,6 +38,12 @@ void initGT911::setInterruptHandler(void (*_isr)(void))
     attachInterrupt(_intPin, _isr, FALLING);
 }
 
+// default delay
+void initGT911::_gt911_delay(uint32_t ms)
+{
+  delay(ms);
+}
+
 initGT911::initGT911(I2CMaster *twi, uint8_t addr) : _wire(twi ? twi : &Master)
 {
   _addr = addr;
@@ -246,7 +252,7 @@ int8_t initGT911::readTouches()
       write(GT911_REG_COORD_ADDR, 0);
       return flag & 0x0F;
     }
-    delay(1);
+    internal_delay(1);
   } while (millis() < timeout);
 
   return 0;

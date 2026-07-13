@@ -90,7 +90,9 @@ private:
   bool readTouchPoints();
   void* context{nullptr};
   void (*async_wait)(void* context){nullptr};
+  void (*internal_delay)(uint32_t){ _gt911_delay};
   static void _gt911_irq_handler(void);
+  static void _gt911_delay(uint32_t);
 
 public:
   initGT911(I2CMaster *twi = &Master, uint8_t addr = GT911_I2C_ADDR_BA);
@@ -117,6 +119,9 @@ public:
   // to run) until the transaction completes
   void setAsyncWait(void (*fn)(void*)) { async_wait = fn; }
   void setContext(void* ctxt) { context = ctxt; }
+
+  // set delay() function
+  void setDelayFn(void (*fn)(uint32_t) = _gt911_delay) { internal_delay = fn; }
 };
 
 #endif // INIT_GT911_H

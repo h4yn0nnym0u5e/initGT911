@@ -7,15 +7,15 @@
 #define INIT_GT911_H
 
 #include <Arduino.h>
-#include <i2c_driver_wire.h>
+#include <i2c_driver.h>
 #include <imx_rt1060/imx_rt1060_i2c_driver.h>
 
 #if !defined(I2C_BUFFER_LENGTH)
-#if defined(I2C_DRIVER_WIRE_H)
+#if defined(IMX_RT1060_I2C_DRIVER_H)
 #define I2C_BUFFER_LENGTH 256 // MAX_MASTER_READ_LENGTH // async I2C library definition
 #else
 #define I2C_BUFFER_LENGTH BUFFER_LENGTH // hack for Teensyduino
-#endif // defined(I2C_DRIVER_WIRE_H)
+#endif // defined(IMX_RT1060_I2C_DRIVER_H)
 #endif // !defined(I2C_BUFFER_LENGTH)
 
 #include "initGT911_Structs.h"

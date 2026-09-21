@@ -101,6 +101,7 @@ public:
   GTConfig *readConfig();
   bool updateConfig();
   GTInfo *readInfo();
+  void setAddr(uint8_t addr) { _addr = addr; }
   I2CMaster& getWire(void) { return *_wire; }
 
   uint8_t touched(uint8_t mode = GT911_MODE_INTERRUPT);

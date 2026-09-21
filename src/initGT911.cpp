@@ -142,21 +142,6 @@ bool initGT911::write(uint16_t reg, uint8_t data)
 uint8_t initGT911::read(uint16_t reg)
 {
   i2cStart(reg);
-  /*
-  if (_wire->endTransmission() != 0)
-  {
-    GT911_Log("I2C read single byte: endTransmission error");
-    return 0;
-  }
-
-  uint8_t got = _wire->requestFrom((int)_addr, 1);
-  if (got == 0 || !_wire->available())
-  {
-    GT911_Log("I2C read single byte: no data");
-    return 0;
-  }
-  return _wire->read();
-  */
   uint8_t result;
   _wire->read_async(_addr,&result,1,true);
   finish();
@@ -166,13 +151,6 @@ uint8_t initGT911::read(uint16_t reg)
 bool initGT911::writeBytes(uint16_t reg, uint8_t *data, uint16_t size)
 {
   i2cStart(reg);
-  /*
-  for (uint16_t i = 0; i < size; i++)
-  {
-    _wire->write(data[i]);
-  }
-  return _wire->endTransmission() == 0;
-  */
   _wire->write_async(_wire->NO_RESTART,data,size,true);
   return endTransmission(size);
 }
@@ -184,13 +162,6 @@ bool initGT911::readBytes(uint16_t reg, uint8_t *data, uint16_t size)
 
   // Start write of register pointer
   i2cStart(reg);
-  /*
-  if (_wire->endTransmission() != 0)
-  {
-    GT911_Log("readBytes I2C error: endTransmission");
-    return false; // I2C error
-  }
-  */
   uint16_t index = 0;
   const unsigned long overallTimeout = 20;//00; // ms
   unsigned long startTime = millis();
@@ -371,7 +342,8 @@ GTInfo *initGT911::readInfo()
   GTInfo* result = nullptr;
   if (readBytes(GT911_REG_DATA, (uint8_t *)&_info, sizeof(_info)))
     result = &_info;
-Serial.printf("Info at %08X\n", (uint32_t) result);    
+  if (nullptr != result)    
+    Serial.printf("Info at %08X ", (uint32_t) result);    
   return result;
 }
 

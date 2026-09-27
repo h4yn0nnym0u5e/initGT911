@@ -116,10 +116,10 @@ bool initGT911::finish(uint32_t timeout_millis)
       else        
         yield();
       if (_wire->finished()) {
-          return false;
+          return true;
       }
   }
-  return true;
+  return false;
 }
 
 
@@ -206,6 +206,24 @@ bool initGT911::readBytes(uint16_t reg, uint8_t *data, uint16_t size)
 //    Y88b  d88P    888    Y88b  d88P   888     888   
 //     "Y8888P88    888     "Y8888P"  8888888 8888888 
 //
+
+bool initGT911::clearBufferStatus(int tries)
+{
+  bool success = false;
+  while (tries--)
+  {
+    if (write(GT911_REG_COORD_ADDR, 0))
+    {
+      tries = 0;
+      success = true;
+    }
+    else
+      delayMicroseconds(500);
+  }
+
+  return success;
+}
+
 uint8_t initGT911::calcChecksum(uint8_t *buf, uint8_t len)
 {
   uint8_t ccsum = 0;
@@ -229,12 +247,14 @@ int8_t initGT911::readTouches()
   do
   {
     uint8_t flag = read(GT911_REG_COORD_ADDR);
-    if ((flag & 0x80) && ((flag & 0x0F) < GT911_MAX_CONTACTS))
+    if ((flag & 0x80))// && ((flag & 0x0F) < GT911_MAX_CONTACTS))
     {
       GT911_Logf("GT911_REG_COORD_ADDR: %02X", flag);
-      write(GT911_REG_COORD_ADDR, 0);
+      clearBufferStatus(); // write(GT911_REG_COORD_ADDR, 0);
       return flag & 0x0F;
     }
+    else
+      break;
     internal_delay(1);
   } while (millis() < timeout);
 
@@ -258,6 +278,8 @@ bool initGT911::readTouchPoints()
       }
     }
   */
+  clearBufferStatus(); // write(GT911_REG_COORD_ADDR, 0);
+
   return result;
 }
 
@@ -273,6 +295,7 @@ bool initGT911::begin(int8_t intPin, int8_t rstPin, uint32_t clk)
 {
   _intPin = intPin;
   _rstPin = rstPin;
+  _clk = clk;
 
   if (_rstPin > 0)
   {

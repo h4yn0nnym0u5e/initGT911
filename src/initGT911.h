@@ -66,6 +66,7 @@ private:
   int8_t _intPin;
   int8_t _rstPin;
   uint8_t _addr;
+  uint32_t _clk;
 
   static volatile bool gt911IRQ;
   bool _configLoaded = false;
@@ -78,7 +79,7 @@ private:
   bool finish(uint32_t timeout_millis = 50);
   bool endTransmission(size_t expected)
   {
-    return finish() && expected == _wire->get_bytes_transferred();  
+    return finish() && expected == _wire->get_bytes_transferred() && I2CError::ok == _wire->error();  
   }
   bool write(uint16_t reg, uint8_t data);
   uint8_t read(uint16_t reg);
@@ -88,6 +89,7 @@ private:
   uint8_t readChecksum();
   int8_t readTouches();
   bool readTouchPoints();
+  bool clearBufferStatus(int tries = 5);
   void* context{nullptr};
   void (*async_wait)(void* context){nullptr};
   void (*internal_delay)(uint32_t){ _gt911_delay};
